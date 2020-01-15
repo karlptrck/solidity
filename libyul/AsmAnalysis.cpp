@@ -101,7 +101,6 @@ bool AsmAnalyzer::operator()(Literal const& _literal)
 	}
 	else if (_literal.kind == LiteralKind::Boolean)
 		yulAssert(_literal.value == "true"_yulstring || _literal.value == "false"_yulstring, "");
-	m_info.stackHeightInfo[&_literal] = m_stackHeight;
 	return true;
 }
 
@@ -155,7 +154,6 @@ bool AsmAnalyzer::operator()(Identifier const& _identifier)
 		}
 		m_stackHeight += stackSize == size_t(-1) ? 1 : stackSize;
 	}
-	m_info.stackHeightInfo[&_identifier] = m_stackHeight;
 	return success;
 }
 
@@ -174,7 +172,6 @@ bool AsmAnalyzer::operator()(ExpressionStatement const& _statement)
 		m_errorReporter.error(Error::Type::TypeError, _statement.location, msg);
 		success = false;
 	}
-	m_info.stackHeightInfo[&_statement] = m_stackHeight;
 	return success;
 }
 
@@ -200,7 +197,6 @@ bool AsmAnalyzer::operator()(Assignment const& _assignment)
 	for (auto const& variableName: _assignment.variableNames)
 		if (!checkAssignment(variableName, 1))
 			success = false;
-	m_info.stackHeightInfo[&_assignment] = m_stackHeight;
 	return success;
 }
 
@@ -243,7 +239,6 @@ bool AsmAnalyzer::operator()(VariableDeclaration const& _varDecl)
 		expectValidType(variable.type, variable.location);
 		m_activeVariables.insert(&std::get<Scope::Variable>(m_currentScope->identifiers.at(variable.name)));
 	}
-	m_info.stackHeightInfo[&_varDecl] = m_stackHeight;
 	return success;
 }
 
@@ -265,7 +260,6 @@ bool AsmAnalyzer::operator()(FunctionDefinition const& _funDef)
 	bool success = (*this)(_funDef.body);
 
 	m_stackHeight = stackHeight;
-	m_info.stackHeightInfo[&_funDef] = m_stackHeight;
 	return success;
 }
 
@@ -346,7 +340,6 @@ bool AsmAnalyzer::operator()(FunctionCall const& _funCall)
 	}
 	// Use argument size instead of parameter count to avoid misleading errors.
 	m_stackHeight += int(returns) - int(_funCall.arguments.size());
-	m_info.stackHeightInfo[&_funCall] = m_stackHeight;
 	return success;
 }
 
@@ -362,8 +355,6 @@ bool AsmAnalyzer::operator()(If const& _if)
 
 	if (!(*this)(_if.body))
 		success = false;
-
-	m_info.stackHeightInfo[&_if] = m_stackHeight;
 
 	return success;
 }
@@ -433,7 +424,6 @@ bool AsmAnalyzer::operator()(Switch const& _switch)
 	}
 
 	m_stackHeight = initialHeight;
-	m_info.stackHeightInfo[&_switch] = m_stackHeight;
 
 	return success;
 }
@@ -470,29 +460,10 @@ bool AsmAnalyzer::operator()(ForLoop const& _for)
 		success = false;
 
 	m_stackHeight = initialHeight;
-	m_info.stackHeightInfo[&_for] = m_stackHeight;
 	m_currentScope = outerScope;
 	m_currentForLoop = outerForLoop;
 
 	return success;
-}
-
-bool AsmAnalyzer::operator()(Break const& _break)
-{
-	m_info.stackHeightInfo[&_break] = m_stackHeight;
-	return true;
-}
-
-bool AsmAnalyzer::operator()(Continue const& _continue)
-{
-	m_info.stackHeightInfo[&_continue] = m_stackHeight;
-	return true;
-}
-
-bool AsmAnalyzer::operator()(Leave const& _leaveStatement)
-{
-	m_info.stackHeightInfo[&_leaveStatement] = m_stackHeight;
-	return true;
 }
 
 bool AsmAnalyzer::operator()(Block const& _block)
@@ -524,7 +495,6 @@ bool AsmAnalyzer::operator()(Block const& _block)
 		success = false;
 	}
 
-	m_info.stackHeightInfo[&_block] = m_stackHeight;
 	m_currentScope = previousScope;
 	return success;
 }
