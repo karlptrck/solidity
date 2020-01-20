@@ -3,18 +3,56 @@
 #include <test/tools/ossfuzz/yulProto.pb.h>
 
 #include <src/libfuzzer/libfuzzer_macro.h>
+#include <libsolutil/Common.h>
 
 namespace solidity::yul::test::yul_fuzzer
 {
+
+using ProtobufMessage = google::protobuf::Message;
+using ProtobufDesc = google::protobuf::Descriptor;
+
+template <typename Proto>
+using LPMPostProcessor = protobuf_mutator::libfuzzer::PostProcessorRegistration<Proto>;
+
+template <typename Proto>
+using FuzzMutatorCallback = std::function<void(Proto*, unsigned int)>;
+
+template <typename P>
+struct YulProtoCBRegistration
+{
+	YulProtoCBRegistration(FuzzMutatorCallback<P> const& _callback)
+	{
+		static LPMPostProcessor<P> reg = {_callback};
+	}
+};
+
+class MutationInfo: public ScopeGuard
+{
+public:
+	MutationInfo(ProtobufMessage* _message, std::string const& _info);
+
+	static void print(std::string const& _str)
+	{
+		std::cout << _str << std::endl;
+	}
+	void exitInfo();
+
+	ProtobufMessage* m_protobufMsg;
+};
+
 struct YulProtoMutator
 {
-	YulProtoMutator(
-		google::protobuf::Descriptor const* _desc,
-		std::function<void(google::protobuf::Message*, unsigned int)> _callback
-	)
-	{
-		protobuf_mutator::libfuzzer::RegisterPostProcessor(_desc, _callback);
-	}
+	enum class PrintChanges { Yes, No };
+
+	template <typename T>
+	static void functionWrapper(
+		FuzzMutatorCallback<T> const& _callback,
+		T* _message,
+		unsigned int _seed,
+		unsigned _period,
+		std::string const& _info,
+		PrintChanges _printChanges = PrintChanges::Yes
+	);
 
 	/// Return an integer literal of the given value.
 	/// @param _value: Value of the integer literal
@@ -38,6 +76,8 @@ struct YulProtoMutator
 	/// @param _seed: Pseudo-random unsigned integer used to create
 	/// type of load i.e., memory, storage, or calldata.
 	static Expression* loadExpression(unsigned _seed);
+
+	static Expression* loadFromZero(unsigned _seed);
 
 	/// Configure function call from a pseudo-random seed.
 	/// @param _call: Pre-allocated FunctionCall protobuf message
